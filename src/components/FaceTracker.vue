@@ -16,6 +16,11 @@ import { Camera } from '@mediapipe/camera_utils';
 const video = ref(null);
 const threeCanvas = ref(null);
 
+let targetPosition = new THREE.Vector3();
+let currentPosition = new THREE.Vector3();
+let targetRotation = new THREE.Euler();
+let currentRotation = new THREE.Euler();
+
 // Three.js variables
 let scene, camera, renderer, sunglasses, faceMesh;
 
@@ -62,16 +67,14 @@ function loadSunglassesModel() {
     // Calculate initial scale based on model size
     const bbox = new THREE.Box3().setFromObject(sunglasses);
     const size = bbox.getSize(new THREE.Vector3());
-    const scale = 0.1 / size.x; // Base scale factor
+    const scale = 0.8 / size.x; // Base scale factor
     // const scale = 21.80; // Base scale factor
 
-    sunglasses.scale.set(scale, scale, scale);
+    sunglasses.scale.set(scale, -scale, scale);
     
     // Center the model
     const center = bbox.getCenter(new THREE.Vector3());
     sunglasses.position.sub( center.multiplyScalar(scale) );
-
-    // sunglasses.position.set(-0.31, 0.11, -1.04); // Adjusted position for better alignment
     
     // Initial rotation to face camera
     sunglasses.rotation.set(0, 0, 0);
@@ -112,31 +115,39 @@ function updateSunglassesPosition(landmarks) {
   const rightEye = landmarks[RIGHT_EYE_INDEX];
   const noseBridge = landmarks[NOSE_BRIDGE_INDEX];
 
+  const mirroredLeftEyeX  = 1 - leftEye.x;
+  const mirroredRightEyeX = 1 - rightEye.x;
+ 
   // Calculate eye center in normalized coordinates
-  const eyeCenterX = (leftEye.x + rightEye.x) / 2;
+  const eyeCenterX = (mirroredLeftEyeX + mirroredRightEyeX) / 2;
   const eyeCenterY = (leftEye.y + rightEye.y) / 2;
 
   // Convert to Three.js coordinates with proper scaling
-  const x = (eyeCenterX - 0.5) * 4;
-  const y = -(eyeCenterY - 0.5) * 4 - 0.15; // Adjusted downward
-  
-  // Calculate eye distance for dynamic scaling
-  const eyeDist = Math.hypot(rightEye.x - leftEye.x, rightEye.y - leftEye.y);
-  const scale = eyeDist * 20; // Adjusted scaling factor
+  const x = (eyeCenterX - 0.5) *  0.62 - 0.31;
+  const y = -(eyeCenterY - 0.5) * 0.22 + 0.11; // Adjusted downward
+  const z = -noseBridge.z * 0.5 - 1.04; // Adjusted to match your z position
 
-  // Calculate head tilt angle
-  const angle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+  // Calculate eye distance for dynamic scaling (if needed)
+  const eyeDist = Math.hypot(mirroredRightEyeX - mirroredLeftEyeX, rightEye.y - leftEye.y);
+  const scale = eyeDist * 43.6; // Adjusted to maintain ~21.80 scale
+  
+  // Calculate head tilt angle (with mirrored x coordinates)
+  const angle = Math.atan2(rightEye.y - leftEye.y, mirroredRightEyeX - mirroredLeftEyeX);
 
   // Apply transformations
-  sunglasses.position.set(x, y, -noseBridge.z * 2 - 0.4);
+  sunglasses.position.set(x, y, z);
   sunglasses.scale.set(scale, scale, scale);
   sunglasses.rotation.set(
-    Math.PI / 8,    // Maintain initial X rotation
-    -angle * 4, // Reduced X rotation
-    angle      // Z rotation
+    Math.PI,           // x rotation (keep at 0 to match your perfect alignment)
+    -angle * 0.5, // reduced y rotation
+    -angle       // z rotation (inverted to match mirrored video)
   );
 
-  console.log(angle)
+  console.log('Current rotation:', {
+    x: sunglasses.rotation.x.toFixed(2),
+    y: sunglasses.rotation.y.toFixed(2),
+    z: sunglasses.rotation.z.toFixed(2)
+  });
 
   renderer.render(scene, camera);
 }
@@ -157,7 +168,8 @@ function updateSunglassesPosition(landmarks) {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.5;/* Flip the video feed */
+  opacity: 0.5;
+  transform: scaleX(-1); /* Mirror effect */
 }
 
 .three-container {
