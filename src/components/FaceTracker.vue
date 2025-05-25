@@ -16,10 +16,8 @@ import { Camera } from '@mediapipe/camera_utils';
 const video = ref(null);
 const threeCanvas = ref(null);
 
-let targetPosition = new THREE.Vector3();
-let currentPosition = new THREE.Vector3();
-let targetRotation = new THREE.Euler();
-let currentRotation = new THREE.Euler();
+// Add these at the top with your other variables
+let room, mixer, clock;
 
 // Three.js variables
 let scene, camera, renderer, sunglasses, faceMesh;
@@ -57,20 +55,43 @@ function initThreeJS() {
   scene.add(directionalLight);
 
   loadSunglassesModel();
+
+  // createRoomEnvironment();
+
+  clock = new THREE.Clock();
 }
+
+
+function createRoomEnvironment() {
+  // Create a simple room
+  const roomGeometry = new THREE.BoxGeometry(10, 10, 10);
+  roomGeometry.translate(0, 0, -5); // Move room back
+  
+  // Remove front faces so we can see inside
+  roomGeometry.faces = roomGeometry.faces.filter((face, i) => i !== 4 && i !== 5);
+  
+  const roomMaterial = new THREE.MeshBasicMaterial({
+    color: 0xcccccc,
+    side: THREE.BackSide,
+    wireframe: false
+  });
+  
+  room = new THREE.Mesh(roomGeometry, roomMaterial);
+  scene.add(room);
+}
+
 
 function loadSunglassesModel() {
   const loader = new GLTFLoader();
-  loader.load('/models/sunglass-1.glb', (gltf) => {
+  loader.load('/models/sunglass-2.glb', (gltf) => {
     sunglasses = gltf.scene;
     
     // Calculate initial scale based on model size
     const bbox = new THREE.Box3().setFromObject(sunglasses);
     const size = bbox.getSize(new THREE.Vector3());
-    const scale = 0.8 / size.x; // Base scale factor
-    // const scale = 21.80; // Base scale factor
+    const scale = 0.01 / size.x; // Base scale factor
 
-    sunglasses.scale.set(scale, -scale, scale);
+    sunglasses.scale.set(scale, scale, scale);
     
     // Center the model
     const center = bbox.getCenter(new THREE.Vector3());
@@ -123,31 +144,27 @@ function updateSunglassesPosition(landmarks) {
   const eyeCenterY = (leftEye.y + rightEye.y) / 2;
 
   // Convert to Three.js coordinates with proper scaling
-  const x = (eyeCenterX - 0.5) *  0.62 - 0.31;
-  const y = -(eyeCenterY - 0.5) * 0.22 + 0.11; // Adjusted downward
-  const z = -noseBridge.z * 0.5 - 1.04; // Adjusted to match your z position
+  const x = (eyeCenterX - 0.5) * 2;
+  const y = -(eyeCenterY - 0.5) * 1.5; // Adjusted downward
+  const z = -noseBridge.z * 0.2 - 0.1; // Adjusted to match your z position
 
   // Calculate eye distance for dynamic scaling (if needed)
   const eyeDist = Math.hypot(mirroredRightEyeX - mirroredLeftEyeX, rightEye.y - leftEye.y);
-  const scale = eyeDist * 43.6; // Adjusted to maintain ~21.80 scale
+  const scale = eyeDist * 20; // Adjusted to maintain ~21.80 scale
   
   // Calculate head tilt angle (with mirrored x coordinates)
   const angle = Math.atan2(rightEye.y - leftEye.y, mirroredRightEyeX - mirroredLeftEyeX);
 
   // Apply transformations
   sunglasses.position.set(x, y, z);
-  sunglasses.scale.set(scale, scale, scale);
-  sunglasses.rotation.set(
-    Math.PI,           // x rotation (keep at 0 to match your perfect alignment)
-    -angle * 0.5, // reduced y rotation
-    -angle       // z rotation (inverted to match mirrored video)
-  );
 
-  console.log('Current rotation:', {
-    x: sunglasses.rotation.x.toFixed(2),
-    y: sunglasses.rotation.y.toFixed(2),
-    z: sunglasses.rotation.z.toFixed(2)
-  });
+  sunglasses.scale.set(1.5, 1.5, 1.5); // Fixed scale for consistency
+  sunglasses.scale.multiplyScalar(scale); // Apply dynamic scaling
+  sunglasses.rotation.set(
+    0,           
+    0, 
+    0
+  );
 
   renderer.render(scene, camera);
 }
